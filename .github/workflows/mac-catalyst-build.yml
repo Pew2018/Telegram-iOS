@@ -14,7 +14,7 @@ on:
       - MODULE.bazel
 
 concurrency:
-  group: swiftgram-mac-build-\${{ github.ref }}
+  group: swiftgram-mac-build-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -26,8 +26,8 @@ jobs:
     runs-on: xcode-27
     timeout-minutes: 120
     env:
-      TELEGRAM_API_ID: \${{ secrets.TELEGRAM_API_ID }}
-      TELEGRAM_API_HASH: \${{ secrets.TELEGRAM_API_HASH }}
+      TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
     steps:
       - name: Check out entire real Swiftgram source graph
         uses: actions/checkout@v4
@@ -56,8 +56,8 @@ jobs:
         with:
           name: Swiftgram-Catalyst-build-diagnostics
           path: |
-            \${{ runner.temp }}/swiftgram-catalyst/generate-project.log
-            \${{ runner.temp }}/swiftgram-catalyst/xcodebuild.log
+            ${{ runner.temp }}/swiftgram-catalyst/generate-project.log
+            ${{ runner.temp }}/swiftgram-catalyst/xcodebuild.log
           if-no-files-found: warn
       - name: Write build status
         if: always()

@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-OUT="\${RUNNER_TEMP:-/tmp}/swiftgram-catalyst"
+OUT="${RUNNER_TEMP:-/tmp}/swiftgram-catalyst"
 mkdir -p "$OUT"
 CONFIG="$OUT/build-configuration.json"
 PROJECT="$ROOT/Telegram/Swiftgram.xcodeproj"
@@ -97,13 +97,14 @@ if [[ $status -ne 0 ]]; then
 fi
 
 echo "::group::Find and authenticate real output (no fake/renamed IPA)"
-mapfile -t apps < <(find "$OUT/DerivedData/Build/Products" -name Swiftgram.app -type d -print)
-if [[ \${#apps[@]} -eq 0 ]]; then
+apps=()
+while IFS= read -r app; do apps+=("$app"); done < <(find "$OUT/DerivedData/Build/Products" -name Swiftgram.app -type d -print)
+if [[ ${#apps[@]} -eq 0 ]]; then
   echo "::error::Xcode completed without generating Swiftgram.app"
   exit 1
 fi
 found=0
-for app in "\${apps[@]}"; do
+for app in "${apps[@]}"; do
   if [[ -f "$app/Contents/Info.plist" ]] && [[ -d "$app/Contents/MacOS" ]]; then
     found=1
     codesign --force --deep --sign - "$app"
