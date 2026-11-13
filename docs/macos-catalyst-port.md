@@ -28,8 +28,8 @@ working Mac app.
 
 ## Stage 0: real source / SDK compatibility probe
 
-`.github/workflows/mac-catalyst.yml` uses GitHub's Apple Silicon
-`xcode-27` runner. The script `tools/mac-catalyst-probe.sh` type-checks
+The initial entry-point CI workflow has been retired to avoid misleading green
+checks that don't produce a full app. The script `tools/mac-catalyst-probe.sh` type-checks
 `Telegram/Telegram-iOS/Application.swift` and checks the Objective-C
 `Telegram/Telegram-iOS/main.m` entry point against the **macabi**
 (`arm64-apple-ios15.0-macabi`) ABI, without substituting a fake application.
@@ -84,7 +84,24 @@ and the app must actually open the existing Swiftgram UI. The untrusted
 unsigned/unnotarized development build may require local Gatekeeper handling;
 a public distribution requires appropriate Apple signing and notarization.
 
+## Stage 1: full application build attempt
+
+`.github/workflows/mac-catalyst-build.yml` (the only active macOS build
+workflow) checks out the full repository, generates the actual Swiftgram
+Xcode project, attempts the full Mac Catalyst build and uploads diagnostic
+logs on failure. It does not publish an app unless the final executable
+passes Mac Catalyst platform and signing checks.
+
+An actual, usable client additionally needs a private Telegram application
+API ID/hash as `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` secrets.
+With no secrets, the workflow uses placeholder API values **only for compile
+testing**, which cannot authenticate as a proper client.
+
+The full build is a work in progress; passing the earlier source-entry probe
+does **not** mean a runnable Swiftgram macOS app has been produced.
+
 ## Current deliverable
 
-The CI source-compatibility probe and this migration plan only.
-There is **no verified, functional Swiftgram macOS .app yet**.
+Active full-application build workflow, generated artifacts gated on real
+macabi binary validation, and a written migration plan. **No verified,
+fully functional Swiftgram macOS .app has been confirmed yet.**
