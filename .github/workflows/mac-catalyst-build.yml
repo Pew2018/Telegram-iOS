@@ -1,0 +1,67 @@
+name: Build real Swiftgram Mac Catalyst app
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/mac-catalyst
+    paths:
+      - .github/workflows/mac-catalyst-build.yml
+      - tools/build-mac-catalyst.sh
+      - tools/verify-mac-catalyst-app.sh
+      - Telegram/BUILD
+      - build-system/Make/**
+      - MODULE.bazel
+
+concurrency:
+  group: swiftgram-mac-build-\${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Full Swiftgram target -> verified macabi .app
+    runs-on: xcode-27
+    timeout-minutes: 120
+    env:
+      TELEGRAM_API_ID: \${{ secrets.TELEGRAM_API_ID }}
+      TELEGRAM_API_HASH: \${{ secrets.TELEGRAM_API_HASH }}
+    steps:
+      - name: Check out entire real Swiftgram source graph
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+          persist-credentials: false
+          lfs: false
+      - name: Verify Xcode 27.1 / ARM64
+        run: |
+          uname -m
+          xcodebuild -version
+          xcrun swiftc -version
+      - name: Build full Swiftgram app for Mac Catalyst
+        run: bash tools/build-mac-catalyst.sh
+      - name: Upload verified real .app ZIP (only if successful)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swiftgram-Mac-Catalyst-arm64
+          path: build/mac-catalyst/Swiftgram-Mac-Catalyst-arm64.zip
+          if-no-files-found: error
+      - name: Upload diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swiftgram-Catalyst-build-diagnostics
+          path: |
+            \${{ runner.temp }}/swiftgram-catalyst/generate-project.log
+            \${{ runner.temp }}/swiftgram-catalyst/xcodebuild.log
+          if-no-files-found: warn
+      - name: Write build status
+        if: always()
+        run: |
+          echo "## Full Swiftgram Mac Catalyst build" >> "$GITHUB_STEP_SUMMARY"
+          echo "Only a successfully verified Mac Catalyst executable is uploaded as an app artifact." >> "$GITHUB_STEP_SUMMARY"
+          echo "A failed job means **no installable macOS app was produced**. Build logs are published when available." >> "$GITHUB_STEP_SUMMARY"
