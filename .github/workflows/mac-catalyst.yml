@@ -13,6 +13,10 @@ on:
       - Telegram/BUILD
       - docs/macos-catalyst-port.md
 
+concurrency:
+  group: mac-catalyst-probe-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -25,6 +29,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          filter: blob:none
+          sparse-checkout: |
+            Telegram/BUILD
+            Telegram/Telegram-iOS/Application.swift
+            Telegram/Telegram-iOS/main.m
+            tools/mac-catalyst-probe.sh
+          sparse-checkout-cone-mode: false
       - name: Show Apple toolchain
         run: |
           uname -a
