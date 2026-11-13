@@ -65,6 +65,13 @@ bash tools/mac-catalyst-probe.sh
 
 ### Acceptance checks for a full build (not yet implemented)
 
+The reusable verifier is `tools/verify-mac-catalyst-app.sh`. Run it against
+an actual full build (not against the current source-only probe):
+
+```sh
+bash tools/verify-mac-catalyst-app.sh Swiftgram.app
+```
+
 ```sh
 test -x Swiftgram.app/Contents/MacOS/Swiftgram
 xcrun vtool -show-build Swiftgram.app/Contents/MacOS/Swiftgram
