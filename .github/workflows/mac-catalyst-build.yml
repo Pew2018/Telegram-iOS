@@ -58,6 +58,7 @@ jobs:
           path: |
             ${{ runner.temp }}/swiftgram-catalyst/generate-project.log
             ${{ runner.temp }}/swiftgram-catalyst/xcodebuild.log
+            ${{ runner.temp }}/swiftgram-catalyst/catalyst-build-settings.log
           if-no-files-found: warn
       - name: Write build status
         if: always()
