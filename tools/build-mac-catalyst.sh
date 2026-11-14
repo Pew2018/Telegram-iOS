@@ -74,15 +74,29 @@ echo "::group::Inspect real generated Swiftgram project"
 xcodebuild -list -project "$PROJECT"
 echo "::endgroup::"
 
-echo "::group::Try full Swiftgram Mac Catalyst build"
+# The previous attempt selected the iPhoneOS SDK implicitly. Mac Catalyst
+# requires the macOS SDK even though its source interfaces come from UIKit.
+# Keep the actual arm64/maccatalyst bundle verifier as the final acceptance gate.
+echo "::group::Diagnose generated Swiftgram target platforms"
+xcodebuild -project "$PROJECT" -scheme Swiftgram -configuration Debug \
+  -sdk macosx -showBuildSettings \
+  SUPPORTS_MACCATALYST=YES \
+  SUPPORTED_PLATFORMS="iphoneos iphonesimulator macosx" \
+  CODE_SIGNING_ALLOWED=NO 2>&1 | \
+  grep -E '(^Build settings for |^[[:space:]]+(SDKROOT|SUPPORTED_PLATFORMS|SUPPORTS_MACCATALYST|EFFECTIVE_PLATFORM_NAME|BAZEL|PLATFORM_NAME|TARGETED_DEVICE_FAMILY)[[:space:]]*=)' || true
+echo "::endgroup::"
+
+echo "::group::Try full Swiftgram Mac Catalyst build (macOS SDK)"
 set +e
 xcodebuild \
   -project "$PROJECT" \
   -scheme Swiftgram \
   -configuration Debug \
+  -sdk macosx \
   -destination "generic/platform=macOS,variant=Mac Catalyst" \
   -derivedDataPath "$OUT/DerivedData" \
   -resultBundlePath "$OUT/SwiftgramBuild.xcresult" \
+  SDKROOT=macosx \
   SUPPORTS_MACCATALYST=YES \
   SUPPORTED_PLATFORMS="iphoneos iphonesimulator macosx" \
   CODE_SIGNING_ALLOWED=NO \
