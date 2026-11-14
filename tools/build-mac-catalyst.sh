@@ -78,13 +78,77 @@ echo "::endgroup::"
 # requires the macOS SDK even though its source interfaces come from UIKit.
 # Keep the actual arm64/maccatalyst bundle verifier as the final acceptance gate.
 echo "::group::Diagnose generated Swiftgram target platforms"
+# Capture all targets, not only the first one. In run 43610211158 the SDK
+# override printed macosx for the project but the Swiftgram target remained
+# PLATFORM_NAME=iphoneos / EFFECTIVE_PLATFORM_NAME=-iphoneos.
+SETTINGS_LOG="$OUT/catalyst-build-settings.log"
 xcodebuild -project "$PROJECT" -scheme Swiftgram -configuration Debug \
   -sdk macosx -showBuildSettings \
   SUPPORTS_MACCATALYST=YES \
   SUPPORTED_PLATFORMS="iphoneos iphonesimulator macosx" \
-  CODE_SIGNING_ALLOWED=NO 2>&1 | \
-  grep -E '(^Build settings for |^[[:space:]]+(SDKROOT|SUPPORTED_PLATFORMS|SUPPORTS_MACCATALYST|EFFECTIVE_PLATFORM_NAME|BAZEL|PLATFORM_NAME|TARGETED_DEVICE_FAMILY)[[:space:]]*=)' || true
+  CODE_SIGNING_ALLOWED=NO > "$SETTINGS_LOG" 2>&1
+grep -E '(^Build settings for |^[[:space:]]+(SDKROOT|SUPPORTED_PLATFORMS|SUPPORTS_MACCATALYST|EFFECTIVE_PLATFORM_NAME|PLATFORM_NAME|TARGETED_DEVICE_FAMILY)[[:space:]]*=)' "$SETTINGS_LOG" || true
 echo "::endgroup::"
+
+# SDKROOT=macosx alone does not convert a Bazel-generated ios_application
+# into a Mac Catalyst target. Fail before the misleading destination attempt,
+# retaining exact target settings for the next build-graph porting step.
+if ! grep -Eq '^[[:space:]]*EFFECTIVE_PLATFORM_NAME[[:space:]]*=[[:space:]]*-maccatalyst[[:space:]]*
+
+echo "::group::Try full Swiftgram Mac Catalyst build (macOS SDK)"
+set +e
+xcodebuild \
+  -project "$PROJECT" \
+  -scheme Swiftgram \
+  -configuration Debug \
+  -sdk macosx \
+  -destination "generic/platform=macOS,variant=Mac Catalyst" \
+  -derivedDataPath "$OUT/DerivedData" \
+  -resultBundlePath "$OUT/SwiftgramBuild.xcresult" \
+  SDKROOT=macosx \
+  SUPPORTS_MACCATALYST=YES \
+  SUPPORTED_PLATFORMS="iphoneos iphonesimulator macosx" \
+  CODE_SIGNING_ALLOWED=NO \
+  build \
+  > >(tee "$BUILD_LOG") 2>&1
+status=$?
+set -e
+echo "::endgroup::"
+if [[ $status -ne 0 ]]; then
+  echo "::error::Full Swiftgram Mac Catalyst build failed (exit=$status). See xcodebuild.log artifact."
+  exit "$status"
+fi
+
+echo "::group::Find and authenticate real output (no fake/renamed IPA)"
+apps=()
+while IFS= read -r app; do apps+=("$app"); done < <(find "$OUT/DerivedData/Build/Products" -name Swiftgram.app -type d -print)
+if [[ ${#apps[@]} -eq 0 ]]; then
+  echo "::error::Xcode completed without generating Swiftgram.app"
+  exit 1
+fi
+found=0
+for app in "${apps[@]}"; do
+  if [[ -f "$app/Contents/Info.plist" ]] && [[ -d "$app/Contents/MacOS" ]]; then
+    found=1
+    codesign --force --deep --sign - "$app"
+    bash tools/verify-mac-catalyst-app.sh "$app"
+    rm -rf "$ROOT/build/mac-catalyst"
+    mkdir -p "$ROOT/build/mac-catalyst"
+    ditto -c -k --sequesterRsrc --keepParent "$app" "$ROOT/build/mac-catalyst/Swiftgram-Mac-Catalyst-arm64.zip"
+    echo "REAL_SWIFTGRAM_APP_ARCHIVE=$ROOT/build/mac-catalyst/Swiftgram-Mac-Catalyst-arm64.zip"
+    break
+  fi
+done
+if [[ $found -eq 0 ]]; then
+  echo "::error::Only iOS-style .app layout found; this is not a real macOS app."
+  exit 1
+fi
+echo "::endgroup::"
+ "$SETTINGS_LOG"; then
+  echo "::error::Generated Swiftgram Xcode target is iOS-only, not Mac Catalyst. The Bazel ios_application/rules_xcodeproj graph must generate a real macabi target; SDKROOT and SUPPORTS_MACCATALYST command-line overrides are insufficient."
+  echo "::error::See catalyst-build-settings.log in the diagnostic artifact. Do not package the iOS app as a macOS app."
+  exit 1
+fi
 
 echo "::group::Try full Swiftgram Mac Catalyst build (macOS SDK)"
 set +e
